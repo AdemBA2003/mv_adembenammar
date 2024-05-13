@@ -2,43 +2,56 @@
 
 namespace App\Controller;
 
-use App\Entity\VinylMix;
 use App\Repository\VinylMixRepository;
-use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use function Symfony\Component\String\u;
 
 class VinylController extends AbstractController
 {
-    #[Route('/mix/new')]
-    public function new(EntityManagerInterface $entityManager): Response
+    public function __construct(
+        private bool $isDebug
+    )
+    {}
+
+    #[Route('/', name: 'app_homepage')]
+    public function homepage(): Response
     {
-        $mix = new VinylMix();
-        $mix->setTitle('Do you Remember... Phil Collins?!');
-        $mix->setDescription('A pure mix of drummers turned singers!');
-        $genres = ['pop', 'rock'];
-        $mix->setGenre($genres[array_rand($genres)]);
-        $mix->setTrackCount(rand(5, 20));
-        $mix->setVotes(rand(-50, 50));
+        $tracks = [
+            ['song' => 'Gangsta\'s Paradise', 'artist' => 'Coolio'],
+            ['song' => 'Waterfalls', 'artist' => 'TLC'],
+            ['song' => 'Creep', 'artist' => 'Radiohead'],
+            ['song' => 'Kiss from a Rose', 'artist' => 'Seal'],
+            ['song' => 'On Bended Knee', 'artist' => 'Boyz II Men'],
+            ['song' => 'Fantasy', 'artist' => 'Mariah Carey'],
+        ];
 
-        $entityManager->persist($mix);
-        $entityManager->flush();
-
-        return new Response(sprintf(
-            'Mix %d is %d tracks of pure 80\'s heaven',
-            $mix->getId(),
-            $mix->getTrackCount()
-        ));
+        return $this->render('vinyl/homepage.html.twig', [
+            'title' => 'PB & Jams',
+            'tracks' => $tracks,
+        ]);
     }
 
-    #[Route('/mix/{id}')]
-    public function show($id, VinylMixRepository $mixRepository): Response
+    #[Route('/browse/{slug}', name: 'app_browse')]
+    public function browse(VinylMixRepository $mixRepository, Request $request, string $slug = null): Response
     {
-        $mix = $mixRepository->find($id);
+        $genre = $slug ? u(str_replace('-', ' ', $slug))->title(true) : null;
 
-        return $this->render('mix/show.html.twig', [
-            'mix' => $mix,
+        $queryBuilder = $mixRepository->createOrderedByVotesQueryBuilder($slug);
+        $adapter = new QueryAdapter($queryBuilder);
+        $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
+            $adapter,
+            $request->query->get('page', 1),
+            9
+        );
+
+        return $this->render('vinyl/browse.html.twig', [
+            'genre' => $genre,
+            'pager' => $pagerfanta,
         ]);
     }
 }

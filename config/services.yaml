@@ -14,3 +14,8 @@ services:
       - "../src/Kernel.php"
 
   # You don't need to define VinylController as a service here.
+
+  # Configuration spécifique pour le service VinylController
+  App\Controller\VinylController:
+    arguments:
+      $isDebug: '%kernel.debug%'
